@@ -10,12 +10,12 @@ async def create_reminder(session: AsyncSession, project_id: int, description: s
     session.add(reminder)
     await session.commit()
     await session.refresh(reminder)
-    return ReminderSchema.from_orm(reminder)
+    return ReminderSchema.model_validate(reminder)
 
 async def list_reminders(session: AsyncSession, project_id: int) -> list[ReminderSchema]:
     result = await session.execute(select(Reminder).where(Reminder.project_id == project_id))
     reminders = result.scalars().all()
-    return [ReminderSchema.from_orm(r) for r in reminders]
+    return [ReminderSchema.model_validate(r) for r in reminders]
 
 async def delete_reminder(session: AsyncSession, reminder_id: int) -> None:
     await session.execute(delete(Reminder).where(Reminder.id == reminder_id))
@@ -25,4 +25,4 @@ async def due_reminders(session: AsyncSession, now: datetime) -> list[ReminderSc
     stmt = select(Reminder).where(Reminder.remind_at <= now).options(selectinload(Reminder.project))
     result = await session.execute(stmt)
     reminders = result.scalars().all()
-    return [ReminderSchema.from_orm(r) for r in reminders]
+    return [ReminderSchema.model_validate(r) for r in reminders]
