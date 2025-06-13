@@ -1,11 +1,10 @@
 from datetime import datetime
 
-try:
-    from langchain.tools import tool
-except Exception:  # pragma: no cover - fallback for new versions
-    from langchain_core.tools import tool
+from langchain_core.tools import tool
 
 from ..database.session import async_session_factory
+from ..services.projects import create_project, list_projects, delete_project
+from ..services.reminders import create_reminder, list_reminders, delete_reminder
 from ..services.tasks import (
     create_task,
     list_tasks,
@@ -14,7 +13,6 @@ from ..services.tasks import (
     add_task_result,
     list_task_results,
 )
-
 
 @tool("create_task")
 async def create_task_tool(
@@ -114,11 +112,56 @@ async def list_task_results_tool(task_id: int) -> list[dict]:
         return [r.dict() for r in results]
 
 
-task_tools = [
-    create_task_tool,
-    list_tasks_tool,
-    update_task_tool,
-    delete_task_tool,
-    add_task_result_tool,
-    list_task_results_tool,
-]
+@tool
+async def create_project_tool(user_id: int, title: str, description: str | None = None) -> str:
+    """Create a new project for the user and return its id."""
+    async with async_session_factory() as session:
+        project = await create_project(session, user_id, title, description)
+        return str(project.id)
+
+
+@tool
+async def list_projects_tool(user_id: int) -> str:
+    """List all projects for the given user."""
+    async with async_session_factory() as session:
+        projects = await list_projects(session, user_id)
+        return "\n".join(f"{p.id}: {p.title}" for p in projects)
+
+
+@tool
+async def delete_project_tool(user_id: int, project_id: int) -> str:
+    """Delete a project by id for the given user."""
+    async with async_session_factory() as session:
+        await delete_project(session, project_id, user_id)
+        return "deleted"
+
+
+@tool
+async def create_reminder_tool(project_id: int, when: str, description: str = "") -> str:
+    """Create a reminder for a project.
+
+    Args:
+        project_id: target project id
+        when: ISO datetime string
+        description: reminder text
+    """
+    remind_at = datetime.fromisoformat(when)
+    async with async_session_factory() as session:
+        reminder = await create_reminder(session, project_id, description, remind_at)
+        return str(reminder.id)
+
+
+@tool
+async def list_reminders_tool(project_id: int) -> str:
+    """List all reminders for the project."""
+    async with async_session_factory() as session:
+        reminders = await list_reminders(session, project_id)
+        return "\n".join(f"{r.id}: {r.description} at {r.remind_at}" for r in reminders)
+
+
+@tool
+async def delete_reminder_tool(reminder_id: int) -> str:
+    """Delete reminder by id."""
+    async with async_session_factory() as session:
+        await delete_reminder(session, reminder_id)
+        return "deleted"
